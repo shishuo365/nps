@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"ehang.io/nps/bridge"
 	"ehang.io/nps/lib/common"
@@ -38,6 +39,17 @@ func (s *TunnelModeServer) Start() error {
 			logs.Warn("client id %d, task id %d,error %s, when tcp connection", s.task.Client.Id, s.task.Id, err.Error())
 			c.Close()
 			return
+		}
+		// 阿里云SLB健康检查，网段100.64.0.0/10，即100.64.x.x到100.127.x.x
+		// https://help.aliyun.com/document_detail/55205.html#section-yn3-sqx-wdb
+		// https://help.aliyun.com/document_detail/55205.html#section-11
+		if strings.HasPrefix(c.RemoteAddr().String(), "100.") {
+			if ip := strings.Split(c.RemoteAddr().String(), "."); len(ip) == 4 {
+				if v, err := strconv.ParseInt(ip[1], 10, 32); err == nil && 64 <= v && v <= 127 {
+					c.Close()
+					return
+				}
+			}
 		}
 		logs.Trace("new tcp connection,local port %d,client %d,remote address %s", s.task.Port, s.task.Client.Id, c.RemoteAddr())
 		s.process(conn.NewConn(c), s)

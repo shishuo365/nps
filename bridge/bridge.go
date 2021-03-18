@@ -164,6 +164,17 @@ func (s *Bridge) verifySuccess(c *conn.Conn) {
 }
 
 func (s *Bridge) cliProcess(c *conn.Conn) {
+	// 阿里云SLB健康检查，网段100.64.0.0/10，即100.64.x.x到100.127.x.x
+	// https://help.aliyun.com/document_detail/55205.html#section-yn3-sqx-wdb
+	// https://help.aliyun.com/document_detail/55205.html#section-11
+	if strings.HasPrefix(c.Conn.RemoteAddr().String(), "100.") {
+		if ip := strings.Split(c.Conn.RemoteAddr().String(), "."); len(ip) == 4 {
+			if v, err := strconv.ParseInt(ip[1], 10, 32); err == nil && 64 <= v && v <= 127 {
+				c.Close()
+				return
+			}
+		}
+	}
 	//read test flag
 	if _, err := c.GetShortContent(3); err != nil {
 		logs.Info("The client %s connect error", c.Conn.RemoteAddr(), err.Error())
